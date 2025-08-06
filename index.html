@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1, h2, h3 {
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    h2 {
+      font-size: 1.5em;
+      margin-bottom: 15px;
+    }
+    .form-section, .preview-section {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .item-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 100px;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    input, button {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1em;
+    }
+    input:focus {
+      outline: none;
+      border-color: #007bff;
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+    }
+    button {
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .remove-btn {
+      background: #dc3545;
+    }
+    .remove-btn:hover {
+      background: #b02a37;
+    }
+    .add-btn {
+      background: #28a745;
+    }
+    .add-btn:hover {
+      background: #1e7e34;
+    }
+    .error {
+      color: #dc3545;
+      margin-bottom: 15px;
+      padding: 10px;
+      border-left: 4px solid #dc3545;
+      background: #f8d7da;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background: #f1f1f1;
+    }
+    .text-right {
+      text-align: right;
+    }
+    .download-btn {
+      display: block;
+      width: 200px;
+      margin: 20px auto;
+      padding: 12px;
+      background: #28a745;
+    }
+    .download-btn:hover {
+      background: #1e7e34;
+    }
+    @media (max-width: 600px) {
+      .item-row {
+        grid-template-columns: 1fr;
+      }
+      .form-group {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Invoice Generator</h1>
+  <div id="error" class="error" style="display: none;"></div>
+
+  <!-- Form Section -->
+  <div class="form-section">
+    <h2>Enter Invoice Details</h2>
+    
+    <!-- Business Information -->
+    <h3>Business Information</h3>
+    <div class="form-group">
+      <input type="text" id="business-name" placeholder="Business Name *" required>
+      <input type="text" id="business-address" placeholder="Business Address *" required>
+      <input type="email" id="business-email" placeholder="Business Email *" required>
+      <input type="text" id="business-taxid" placeholder="Tax ID">
+    </div>
+
+    <!-- Client Information -->
+    <h3>Client Information</h3>
+    <div class="form-group">
+      <input type="text" id="client-name" placeholder="Client Name *" required>
+      <input type="text" id="client-address" placeholder="Client Address *" required>
+      <input type="email" id="client-email" placeholder="Client Email *" required>
+    </div>
+
+    <!-- Invoice Details -->
+    <h3>Invoice Details</h3>
+    <div class="form-group">
+      <input type="text" id="invoice-number" placeholder="Invoice Number *" required>
+      <input type="date" id="issue-date" required>
+      <input type="date" id="due-date" required>
+    </div>
+
+    <!-- Items -->
+    <h3>Items</h3>
+    <div id="items">
+      <div class="item-row">
+        <input type="text" class="item-description" placeholder="Product Description *" required>
+        <input type="number" class="item-quantity" placeholder="Quantity" min="1" value="1" required>
+        <input type="number" class="item-unit-price" placeholder="Unit Price *" min="0" step="0.01" required>
+        <button class="remove-btn">Remove</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addItem()">Add Item</button>
+  </div>
+
+  <!-- Invoice Preview -->
+  <div class="preview-section">
+    <h2 id="preview-title">Invoice</h2>
+    <div class="form-group">
+      <div>
+        <p><strong>From:</strong></p>
+        <p id="preview-business-name">Your Business Name</p>
+        <p id="preview-business-address">Your Business Address</p>
+        <p id="preview-business-email">Your Business Email</p>
+        <p id="preview-business-taxid">Your Tax ID</p>
+      </div>
+      <div>
+        <p><strong>To:</strong></p>
+        <p id="preview-client-name">Client Name</p>
+        <p id="preview-client-address">Client Address</p>
+        <p id="preview-client-email">Client Email</p>
+      </div>
+    </div>
+    <div>
+      <p><strong>Invoice Number:</strong> <span id="preview-invoice-number">N/A</span></p>
+      <p><strong>Issue Date:</strong> <span id="preview-issue-date"></span></p>
+      <p><strong>Due Date:</strong> <span id="preview-due-date"></span></p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="text-right">Quantity</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody id="preview-items"></tbody>
+    </table>
+    <div class="text-right">
+      <p><strong>Subtotal:</strong> $<span id="preview-subtotal">0.00</span></p>
+      <p><strong>Tax (10%):</strong> $<span id="preview-tax">0.00</span></p>
+      <p><strong>Total:</strong> $<span id="preview-total">0.00</span></p>
+    </div>
+  </div>
+
+  <!-- Download Button -->
+  <button class="download-btn" onclick="generatePDF()">Download Invoice as PDF</button>
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    const taxRate = 0.1; // 10% tax rate
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    document.getElementById('issue-date').value = today;
+    document.getElementById('due-date').value = dueDate;
+
+    function addItem() {
+      const itemsContainer = document.getElementById('items');
+      const itemRow = document.createElement('div');
+      itemRow.className = 'item-row';
+      itemRow.innerHTML = `
+        <input type="text" class="item-description" placeholder="Product Description *" required>
+        <input type="number" class="item-quantity" placeholder="Quantity" min="1" value="1" required>
+        <input type="number" class="item-unit-price" placeholder="Unit Price *" min="0" step="0.01" required>
+        <button class="remove-btn" onclick="removeItem(this)">Remove</button>
+      `;
+      itemsContainer.appendChild(itemRow);
+      attachInputListeners();
+      updatePreview();
+    }
+
+    function removeItem(button) {
+      button.parentElement.remove();
+      updatePreview();
+    }
+
+    function attachInputListeners() {
+      const inputs = document.querySelectorAll('input');
+      inputs.forEach(input => {
+        input.addEventListener('input', updatePreview);
+      });
+    }
+
+    function updatePreview() {
+      // Business Info
+      document.getElementById('preview-business-name').textContent = document.getElementById('business-name').value || 'Your Business Name';
+      document.getElementById('preview-business-address').textContent = document.getElementById('business-address').value || 'Your Business Address';
+      document.getElementById('preview-business-email').textContent = document.getElementById('business-email').value || 'Your Business Email';
+      document.getElementById('preview-business-taxid').textContent = document.getElementById('business-taxid').value || 'Your Tax ID';
+      document.getElementById('preview-title').textContent = document.getElementById('business-name').value ? `${document.getElementById('business-name').value} Invoice` : 'Invoice';
+
+      // Client Info
+      document.getElementById('preview-client-name').textContent = document.getElementById('client-name').value || 'Client Name';
+      document.getElementById('preview-client-address').textContent = document.getElementById('client-address').value || 'Client Address';
+      document.getElementById('preview-client-email').textContent = document.getElementById('client-email').value || 'Client Email';
+
+      // Invoice Info
+      document.getElementById('preview-invoice-number').textContent = document.getElementById('invoice-number').value || 'N/A';
+      document.getElementById('preview-issue-date').textContent = document.getElementById('issue-date').value || today;
+      document.getElementById('preview-due-date').textContent = document.getElementById('due-date').value || dueDate;
+
+      // Items
+      const items = document.querySelectorAll('.item-row');
+      const previewItems = document.getElementById('preview-items');
+      previewItems.innerHTML = '';
+      let subtotal = 0;
+      items.forEach(item => {
+        const description = item.querySelector('.item-description').value || 'N/A';
+        const quantity = parseInt(item.querySelector('.item-quantity').value) || 1;
+        const unitPrice = parseFloat(item.querySelector('.item-unit-price').value) || 0;
+        const total = quantity * unitPrice;
+        subtotal += total;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${description}</td>
+          <td class="text-right">${quantity}</td>
+          <td class="text-right">$${unitPrice.toFixed(2)}</td>
+          <td class="text-right">$${total.toFixed(2)}</td>
+        `;
+        previewItems.appendChild(row);
+      });
+
+      // Totals
+      const tax = subtotal * taxRate;
+      const total = subtotal + tax;
+      document.getElementById('preview-subtotal').textContent = subtotal.toFixed(2);
+      document.getElementById('preview-tax').textContent = tax.toFixed(2);
+      document.getElementById('preview-total').textContent = total.toFixed(2);
+    }
+
+    function validateForm() {
+      const errorDiv = document.getElementById('error');
+      errorDiv.style.display = 'none';
+      errorDiv.textContent = '';
+
+      if (!document.getElementById('business-name').value) {
+        errorDiv.textContent = 'Please enter the business name.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      if (!document.getElementById('business-address').value) {
+        errorDiv.textContent = 'Please enter the business address.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      if (!document.getElementById('business-email').value) {
+        errorDiv.textContent = 'Please enter the business email.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      if (!document.getElementById('client-name').value) {
+        errorDiv.textContent = 'Please enter the client name.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      if (!document.getElementById('client-address').value) {
+        errorDiv.textContent = 'Please enter the client address.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      if (!document.getElementById('client-email').value) {
+        errorDiv.textContent = 'Please enter the client email.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      if (!document.getElementById('invoice-number').value) {
+        errorDiv.textContent = 'Please enter the invoice number.';
+        errorDiv.style.display = 'block';
+        return false;
+      }
+      const items = document.querySelectorAll('.item-row');
+      for (let item of items) {
+        if (!item.querySelector('.item-description').value) {
+          errorDiv.textContent = 'Please enter a description for all items.';
+          errorDiv.style.display = 'block';
+          return false;
+        }
+        if (parseFloat(item.querySelector('.item-unit-price').value) <= 0) {
+          errorDiv.textContent = 'Please enter a valid unit price for all items.';
+          errorDiv.style.display = 'block';
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function generatePDF() {
+      if (!validateForm()) return;
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('INVOICE', 105, 20, { align: 'center' });
+      doc.setFontSize(12);
+      doc.setLineWidth(0.5);
+      doc.line(20, 25, 190, 25);
+
+      // Business Information
+      doc.text('From:', 20, 35);
+      doc.text(document.getElementById('business-name').value, 20, 42);
+      doc.text(document.getElementById('business-address').value, 20, 49);
+      doc.text(`Email: ${document.getElementById('business-email').value}`, 20, 56);
+      doc.text(`Tax ID: ${document.getElementById('business-taxid').value || 'N/A'}`, 20, 63);
+
+      // Client Information
+      doc.text('To:', 110, 35);
+      doc.text(document.getElementById('client-name').value, 110, 42);
+      doc.text(document.getElementById('client-address').value, 110, 49);
+      doc.text(`Email: ${document.getElementById('client-email').value}`, 110, 56);
+
+      // Invoice Details
+      doc.text(`Invoice Number: ${document.getElementById('invoice-number').value}`, 20, 75);
+      doc.text(`Issue Date: ${document.getElementById('issue-date').value}`, 20, 82);
+      doc.text(`Due Date: ${document.getElementById('due-date').value}`, 110, 75);
+
+      // Itemized Table
+      doc.setFillColor(240, 240, 240);
+      doc.rect(20, 90, 170, 10, 'F');
+      doc.text('Description', 22, 96);
+      doc.text('Qty', 100, 96, { align: 'right' });
+      doc.text('Unit Price', 140, 96, { align: 'right' });
+      doc.text('Total', 180, 96, { align: 'right' });
+
+      let y = 103;
+      let subtotal = 0;
+      const items = document.querySelectorAll('.item-row');
+      items.forEach(item => {
+        const description = item.querySelector('.item-description').value;
+        const quantity = parseInt(item.querySelector('.item-quantity').value) || 1;
+        const unitPrice = parseFloat(item.querySelector('.item-unit-price').value) || 0;
+        const total = quantity * unitPrice;
+        subtotal += total;
+        doc.text(description.substring(0, 30), 22, y);
+        doc.text(quantity.toString(), 100, y, { align: 'right' });
+        doc.text(`$${unitPrice.toFixed(2)}`, 140, y, { align: 'right' });
+        doc.text(`$${total.toFixed(2)}`, 180, y, { align: 'right' });
+        y += 8;
+      });
+
+      // Totals
+      const tax = subtotal * taxRate;
+      const total = subtotal + tax;
+      doc.line(20, y, 190, y);
+      y += 8;
+      doc.text(`Subtotal: $${subtotal.toFixed(2)}`, 140, y, { align: 'right' });
+      y += 8;
+      doc.text(`Tax (10%): $${tax.toFixed(2)}`, 140, y, { align: 'right' });
+      y += 8;
+      doc.text(`Total: $${total.toFixed(2)}`, 140, y, { align: 'right' });
+
+      doc.save(`invoice_${document.getElementById('invoice-number').value || 'INV'}.pdf`);
+    }
+
+    attachInputListeners();
+    updatePreview();
+  </script>
+</body>
+</html>
