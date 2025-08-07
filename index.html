@@ -55,6 +55,10 @@
       border-color: #007bff;
       box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
     }
+    input[readonly] {
+      background-color: #e9ecef;
+      cursor: not-allowed;
+    }
     button {
       background: #007bff;
       color: #fff;
@@ -131,10 +135,9 @@
     <!-- Business Information -->
     <h3>Business Information</h3>
     <div class="form-group">
-      <input type="text" id="business-name" placeholder="Business Name *" required>
-      <input type="text" id="business-address" placeholder="Business Address *" required>
-      <input type="email" id="business-email" placeholder="Business Email *" required>
-      <input type="text" id="business-taxid" placeholder="Tax ID">
+      <input type="text" id="business-name" value="AAMS" readonly>
+      <input type="text" id="business-address" value="Kurla Camp, Ulhasnagar 4" readonly>
+      <input type="email" id="business-email" value="aams.help@gmail.com" readonly>
     </div>
 
     <!-- Client Information -->
@@ -148,9 +151,10 @@
     <!-- Invoice Details -->
     <h3>Invoice Details</h3>
     <div class="form-group">
-      <input type="text" id="invoice-number" placeholder="Invoice Number *" required>
-      <input type="date" id="issue-date" required>
-      <input type="date" id="due-date" required>
+      <input type="text" id="invoice-number" readonly>
+      <input type="text" id="serial-number" placeholder="Serial Number *" required>
+      <input type="date" id="invoice-date" readonly>
+      <input type="time" id="invoice-time" readonly>
     </div>
 
     <!-- Items -->
@@ -160,7 +164,7 @@
         <input type="text" class="item-description" placeholder="Product Description *" required>
         <input type="number" class="item-quantity" placeholder="Quantity" min="1" value="1" required>
         <input type="number" class="item-unit-price" placeholder="Unit Price *" min="0" step="0.01" required>
-        <button class="remove-btn">Remove</button>
+        <button class="remove-btn" onclick="removeItem(this)">Remove</button>
       </div>
     </div>
     <button class="add-btn" onclick="addItem()">Add Item</button>
@@ -168,14 +172,13 @@
 
   <!-- Invoice Preview -->
   <div class="preview-section">
-    <h2 id="preview-title">Invoice</h2>
+    <h2 id="preview-title">AAMS Invoice</h2>
     <div class="form-group">
       <div>
         <p><strong>From:</strong></p>
-        <p id="preview-business-name">Your Business Name</p>
-        <p id="preview-business-address">Your Business Address</p>
-        <p id="preview-business-email">Your Business Email</p>
-        <p id="preview-business-taxid">Your Tax ID</p>
+        <p id="preview-business-name">AAMS</p>
+        <p id="preview-business-address">Kurla Camp, Ulhasnagar 4</p>
+        <p id="preview-business-email">aams.help@gmail.com</p>
       </div>
       <div>
         <p><strong>To:</strong></p>
@@ -186,8 +189,9 @@
     </div>
     <div>
       <p><strong>Invoice Number:</strong> <span id="preview-invoice-number">N/A</span></p>
-      <p><strong>Issue Date:</strong> <span id="preview-issue-date"></span></p>
-      <p><strong>Due Date:</strong> <span id="preview-due-date"></span></p>
+      <p><strong>Serial Number:</strong> <span id="preview-serial-number">N/A</span></p>
+      <p><strong>Date:</strong> <span id="preview-invoice-date"></span></p>
+      <p><strong>Time:</strong> <span id="preview-invoice-time"></span></p>
     </div>
     <table>
       <thead>
@@ -201,9 +205,7 @@
       <tbody id="preview-items"></tbody>
     </table>
     <div class="text-right">
-      <p><strong>Subtotal:</strong> $<span id="preview-subtotal">0.00</span></p>
-      <p><strong>Tax (10%):</strong> $<span id="preview-tax">0.00</span></p>
-      <p><strong>Total:</strong> $<span id="preview-total">0.00</span></p>
+      <p><strong>Total:</strong> ₹<span id="preview-total">0.00</span></p>
     </div>
   </div>
 
@@ -212,11 +214,19 @@
 
   <script>
     const { jsPDF } = window.jspdf;
-    const taxRate = 0.1; // 10% tax rate
-    const today = new Date().toISOString().split('T')[0];
-    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    document.getElementById('issue-date').value = today;
-    document.getElementById('due-date').value = dueDate;
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0];
+    const formattedTime = today.toTimeString().split(' ')[0].slice(0, 5);
+    document.getElementById('invoice-date').value = formattedDate;
+    document.getElementById('invoice-time').value = formattedTime;
+
+    function formatInvoiceNumber(serialNumber) {
+      const date = new Date();
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `AAMS-RETAIL-${day}${month}${year}-${serialNumber || 'N/A'}`;
+    }
 
     function addItem() {
       const itemsContainer = document.getElementById('items');
@@ -239,19 +249,18 @@
     }
 
     function attachInputListeners() {
-      const inputs = document.querySelectorAll('input');
+      const inputs = document.querySelectorAll('input:not([readonly])');
       inputs.forEach(input => {
         input.addEventListener('input', updatePreview);
       });
     }
 
     function updatePreview() {
-      // Business Info
-      document.getElementById('preview-business-name').textContent = document.getElementById('business-name').value || 'Your Business Name';
-      document.getElementById('preview-business-address').textContent = document.getElementById('business-address').value || 'Your Business Address';
-      document.getElementById('preview-business-email').textContent = document.getElementById('business-email').value || 'Your Business Email';
-      document.getElementById('preview-business-taxid').textContent = document.getElementById('business-taxid').value || 'Your Tax ID';
-      document.getElementById('preview-title').textContent = document.getElementById('business-name').value ? `${document.getElementById('business-name').value} Invoice` : 'Invoice';
+      // Business Info (hardcoded, non-editable)
+      document.getElementById('preview-business-name').textContent = 'AAMS';
+      document.getElementById('preview-business-address').textContent = 'Kurla Camp, Ulhasnagar 4';
+      document.getElementById('preview-business-email').textContent = 'aams.help@gmail.com';
+      document.getElementById('preview-title').textContent = 'AAMS Invoice';
 
       // Client Info
       document.getElementById('preview-client-name').textContent = document.getElementById('client-name').value || 'Client Name';
@@ -259,36 +268,35 @@
       document.getElementById('preview-client-email').textContent = document.getElementById('client-email').value || 'Client Email';
 
       // Invoice Info
-      document.getElementById('preview-invoice-number').textContent = document.getElementById('invoice-number').value || 'N/A';
-      document.getElementById('preview-issue-date').textContent = document.getElementById('issue-date').value || today;
-      document.getElementById('preview-due-date').textContent = document.getElementById('due-date').value || dueDate;
+      const serialNumber = document.getElementById('serial-number').value;
+      document.getElementById('invoice-number').value = formatInvoiceNumber(serialNumber);
+      document.getElementById('preview-invoice-number').textContent = formatInvoiceNumber(serialNumber);
+      document.getElementById('preview-serial-number').textContent = serialNumber || 'N/A';
+      document.getElementById('preview-invoice-date').textContent = formattedDate;
+      document.getElementById('preview-invoice-time').textContent = formattedTime;
 
       // Items
       const items = document.querySelectorAll('.item-row');
       const previewItems = document.getElementById('preview-items');
       previewItems.innerHTML = '';
-      let subtotal = 0;
+      let total = 0;
       items.forEach(item => {
         const description = item.querySelector('.item-description').value || 'N/A';
         const quantity = parseInt(item.querySelector('.item-quantity').value) || 1;
         const unitPrice = parseFloat(item.querySelector('.item-unit-price').value) || 0;
-        const total = quantity * unitPrice;
-        subtotal += total;
+        const itemTotal = quantity * unitPrice;
+        total += itemTotal;
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${description}</td>
           <td class="text-right">${quantity}</td>
-          <td class="text-right">$${unitPrice.toFixed(2)}</td>
-          <td class="text-right">$${total.toFixed(2)}</td>
+          <td class="text-right">₹${unitPrice.toFixed(2)}</td>
+          <td class="text-right">₹${itemTotal.toFixed(2)}</td>
         `;
         previewItems.appendChild(row);
       });
 
-      // Totals
-      const tax = subtotal * taxRate;
-      const total = subtotal + tax;
-      document.getElementById('preview-subtotal').textContent = subtotal.toFixed(2);
-      document.getElementById('preview-tax').textContent = tax.toFixed(2);
+      // Total
       document.getElementById('preview-total').textContent = total.toFixed(2);
     }
 
@@ -297,21 +305,6 @@
       errorDiv.style.display = 'none';
       errorDiv.textContent = '';
 
-      if (!document.getElementById('business-name').value) {
-        errorDiv.textContent = 'Please enter the business name.';
-        errorDiv.style.display = 'block';
-        return false;
-      }
-      if (!document.getElementById('business-address').value) {
-        errorDiv.textContent = 'Please enter the business address.';
-        errorDiv.style.display = 'block';
-        return false;
-      }
-      if (!document.getElementById('business-email').value) {
-        errorDiv.textContent = 'Please enter the business email.';
-        errorDiv.style.display = 'block';
-        return false;
-      }
       if (!document.getElementById('client-name').value) {
         errorDiv.textContent = 'Please enter the client name.';
         errorDiv.style.display = 'block';
@@ -327,8 +320,8 @@
         errorDiv.style.display = 'block';
         return false;
       }
-      if (!document.getElementById('invoice-number').value) {
-        errorDiv.textContent = 'Please enter the invoice number.';
+      if (!document.getElementById('serial-number').value) {
+        errorDiv.textContent = 'Please enter the serial number.';
         errorDiv.style.display = 'block';
         return false;
       }
@@ -360,10 +353,9 @@
 
       // Business Information
       doc.text('From:', 20, 35);
-      doc.text(document.getElementById('business-name').value, 20, 42);
-      doc.text(document.getElementById('business-address').value, 20, 49);
-      doc.text(`Email: ${document.getElementById('business-email').value}`, 20, 56);
-      doc.text(`Tax ID: ${document.getElementById('business-taxid').value || 'N/A'}`, 20, 63);
+      doc.text('AAMS', 20, 42);
+      doc.text('Kurla Camp, Ulhasnagar 4', 20, 49);
+      doc.text('Email: aams.help@gmail.com', 20, 56);
 
       // Client Information
       doc.text('To:', 110, 35);
@@ -372,9 +364,11 @@
       doc.text(`Email: ${document.getElementById('client-email').value}`, 110, 56);
 
       // Invoice Details
-      doc.text(`Invoice Number: ${document.getElementById('invoice-number').value}`, 20, 75);
-      doc.text(`Issue Date: ${document.getElementById('issue-date').value}`, 20, 82);
-      doc.text(`Due Date: ${document.getElementById('due-date').value}`, 110, 75);
+      const serialNumber = document.getElementById('serial-number').value;
+      doc.text(`Invoice Number: ${formatInvoiceNumber(serialNumber)}`, 20, 75);
+      doc.text(`Serial Number: ${serialNumber}`, 20, 82);
+      doc.text(`Date: ${formattedDate}`, 110, 75);
+      doc.text(`Time: ${formattedTime}`, 110, 82);
 
       // Itemized Table
       doc.setFillColor(240, 240, 240);
@@ -385,33 +379,27 @@
       doc.text('Total', 180, 96, { align: 'right' });
 
       let y = 103;
-      let subtotal = 0;
+      let total = 0;
       const items = document.querySelectorAll('.item-row');
       items.forEach(item => {
         const description = item.querySelector('.item-description').value;
         const quantity = parseInt(item.querySelector('.item-quantity').value) || 1;
         const unitPrice = parseFloat(item.querySelector('.item-unit-price').value) || 0;
-        const total = quantity * unitPrice;
-        subtotal += total;
+        const itemTotal = quantity * unitPrice;
+        total += itemTotal;
         doc.text(description.substring(0, 30), 22, y);
         doc.text(quantity.toString(), 100, y, { align: 'right' });
-        doc.text(`$${unitPrice.toFixed(2)}`, 140, y, { align: 'right' });
-        doc.text(`$${total.toFixed(2)}`, 180, y, { align: 'right' });
+        doc.text(`₹${unitPrice.toFixed(2)}`, 140, y, { align: 'right' });
+        doc.text(`₹${itemTotal.toFixed(2)}`, 180, y, { align: 'right' });
         y += 8;
       });
 
-      // Totals
-      const tax = subtotal * taxRate;
-      const total = subtotal + tax;
+      // Total
       doc.line(20, y, 190, y);
       y += 8;
-      doc.text(`Subtotal: $${subtotal.toFixed(2)}`, 140, y, { align: 'right' });
-      y += 8;
-      doc.text(`Tax (10%): $${tax.toFixed(2)}`, 140, y, { align: 'right' });
-      y += 8;
-      doc.text(`Total: $${total.toFixed(2)}`, 140, y, { align: 'right' });
+      doc.text(`Total: ₹${total.toFixed(2)}`, 140, y, { align: 'right' });
 
-      doc.save(`invoice_${document.getElementById('invoice-number').value || 'INV'}.pdf`);
+      doc.save(`invoice_${formatInvoiceNumber(serialNumber)}.pdf`);
     }
 
     attachInputListeners();
